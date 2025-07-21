@@ -3,15 +3,57 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
+import { animeDatabase, AnimeData } from '@/data/animeDatabase';
+import { useState, useMemo } from 'react';
 
 const Index = () => {
-  const topAnime = [
-    { name: "Атака титанов", rating: 9.0, genre: "Экшен", status: "Завершён", image: "/img/9e7494c5-56b7-4573-a841-cd12aa144adb.jpg" },
-    { name: "Магическая битва", rating: 8.8, genre: "Сёнен", status: "Онгоинг", image: "/img/6fe878c8-bbd8-4223-be9f-af85f9bb2760.jpg" },
-    { name: "Моя геройская академия", rating: 8.5, genre: "Сёнен", status: "Онгоинг", image: "/img/5e46632c-bca9-49a1-910d-b289dc2a8d69.jpg" },
-    { name: "Демон-убийца", rating: 8.7, genre: "Сёнен", status: "Онгоинг", image: "/img/5e46632c-bca9-49a1-910d-b289dc2a8d69.jpg" },
-  ];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState('all');
+  const [sortBy, setSortBy] = useState('rating');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  const allGenres = useMemo(() => {
+    const genres = new Set<string>();
+    animeDatabase.forEach(anime => {
+      anime.genre.forEach(g => genres.add(g));
+    });
+    return Array.from(genres).sort();
+  }, []);
+
+  const filteredAndSortedAnime = useMemo(() => {
+    let filtered = animeDatabase.filter(anime => {
+      const matchesSearch = anime.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          anime.englishName.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesGenre = selectedGenre === 'all' || anime.genre.includes(selectedGenre);
+      return matchesSearch && matchesGenre;
+    });
+
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'rating':
+          return b.rating - a.rating;
+        case 'year':
+          return b.year - a.year;
+        case 'name':
+          return a.name.localeCompare(b.name);
+        default:
+          return b.rating - a.rating;
+      }
+    });
+
+    return filtered;
+  }, [searchQuery, selectedGenre, sortBy]);
+
+  const paginatedAnime = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedAnime.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAndSortedAnime, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredAndSortedAnime.length / itemsPerPage);
 
   const articles = [
     { title: "Топ 10 аниме зимнего сезона 2024", author: "Юки", comments: 23, likes: 147, date: "2 дня назад" },
@@ -112,34 +154,83 @@ const Index = () => {
 
           {/* Top Ratings */}
           <TabsContent value="ratings" className="animate-fade-in">
-            <div className="grid lg:grid-cols-2 gap-6">
-              {topAnime.map((anime, index) => (
-                <Card key={index} className="hover:shadow-lg transition-all duration-300 group">
-                  <CardContent className="p-6">
+            {/* Фильтры и поиск */}
+            <div className="mb-6 space-y-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Поиск аниме..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <Select value={selectedGenre} onValueChange={setSelectedGenre}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="Жанр" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все жанры</SelectItem>
+                    {allGenres.map(genre => (
+                      <SelectItem key={genre} value={genre}>{genre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="Сортировка" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rating">По рейтингу</SelectItem>
+                    <SelectItem value="year">По году</SelectItem>
+                    <SelectItem value="name">По названию</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center justify-between text-sm text-gray-600">
+                <span>Найдено: {filteredAndSortedAnime.length} аниме</span>
+                <span>Страница {currentPage} из {totalPages}</span>
+              </div>
+            </div>
+
+            {/* Список аниме */}
+            <div className="grid lg:grid-cols-2 gap-4 mb-6">
+              {paginatedAnime.map((anime, index) => (
+                <Card key={anime.id} className="hover:shadow-lg transition-all duration-300 group">
+                  <CardContent className="p-4">
                     <div className="flex items-center space-x-4">
                       <div className="relative">
                         <img 
                           src={anime.image} 
                           alt={anime.name}
-                          className="w-16 h-20 object-cover rounded-lg"
+                          className="w-12 h-16 object-cover rounded-lg"
                         />
-                        <div className="absolute -top-2 -left-2 bg-sakura-200 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                          {index + 1}
+                        <div className="absolute -top-2 -left-2 bg-sakura-200 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
                         </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg text-gray-900 group-hover:text-sakura-200 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base text-gray-900 group-hover:text-sakura-200 transition-colors truncate">
                           {anime.name}
                         </h3>
+                        <p className="text-sm text-gray-500 truncate">{anime.englishName}</p>
                         <div className="flex items-center space-x-2 mt-2">
-                          <Badge variant="secondary">{anime.genre}</Badge>
-                          <Badge variant={anime.status === 'Завершён' ? 'default' : 'outline'}>
+                          {anime.genre.slice(0, 2).map(genre => (
+                            <Badge key={genre} variant="secondary" className="text-xs">{genre}</Badge>
+                          ))}
+                          <Badge variant={anime.status === 'Завершён' ? 'default' : 'outline'} className="text-xs">
                             {anime.status}
                           </Badge>
                         </div>
-                        <div className="flex items-center mt-3">
-                          <Icon name="Star" className="h-4 w-4 text-yellow-400 fill-current mr-1" />
-                          <span className="font-semibold text-lg">{anime.rating}</span>
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center">
+                            <Icon name="Star" className="h-4 w-4 text-yellow-400 fill-current mr-1" />
+                            <span className="font-semibold">{anime.rating}</span>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {anime.year} • {anime.episodes} эп.
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -147,6 +238,53 @@ const Index = () => {
                 </Card>
               ))}
             </div>
+
+            {/* Пагинация */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <Icon name="ChevronLeft" className="h-4 w-4" />
+                  Назад
+                </Button>
+                
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const page = currentPage <= 3 ? i + 1 : 
+                               currentPage >= totalPages - 2 ? totalPages - 4 + i :
+                               currentPage - 2 + i;
+                    
+                    if (page < 1 || page > totalPages) return null;
+                    
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-10"
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Вперёд
+                  <Icon name="ChevronRight" className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           {/* Articles */}
